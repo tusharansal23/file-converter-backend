@@ -7,7 +7,8 @@ const mammoth = require('mammoth');
 const { exec } = require('child_process');
 const sharp = require('sharp');
 const { PDFDocument } = require('pdf-lib');
-const Poppler = require('pdf-poppler'); // ✅ NEW for PDF to JPG
+// const Poppler = require('pdf-poppler'); // ✅ NEW for PDF to JPG
+const { fromPath } = require("pdf2pic");
 
 const app = express();
 const PORT = 4000;
@@ -101,26 +102,26 @@ app.post('/convert', upload.single('file'), async (req, res) => {
     }
 
     // ✅ PDF to JPG using pdf-poppler
-    else if (ext === 'pdf' && targetFormat === 'jpg') {
+    else if (ext === "pdf" && targetFormat === "jpg") {
+      const convertedDir = path.join(__dirname, "converted");
+      if (!fs.existsSync(convertedDir)) fs.mkdirSync(convertedDir);
+    
+      const outputBaseName = `page-${Date.now()}`;
+    
       const options = {
-        format: 'jpeg',
-        out_dir: convertedDir,
-        out_prefix: `page-${Date.now()}`,
-        page: null, // convert all pages
+        density: 150, // image quality
+        saveFilename: outputBaseName,
+        savePath: convertedDir,
+        format: "jpeg",
+        width: 800, // optional
+        height: 1000, // optional
       };
-
-      await Poppler.convert(inputPath, options);
-
-      const outputFiles = fs.readdirSync(convertedDir).filter(f =>
-        f.startsWith(options.out_prefix)
-      );
-
-      if (outputFiles.length === 0) {
-        return res.status(500).send('No JPG generated from PDF');
-      }
-
-      const firstPageImage = path.join(convertedDir, outputFiles[0]);
-      return res.download(firstPageImage, () => fs.unlinkSync(firstPageImage));
+    
+      const convert = fromPath(inputPath, options);
+      const result = await convert(1); // Converts only the first page
+    
+      const imagePath = path.join(convertedDir, `${outputBaseName}.jpg`);
+      return res.download(imagePath, () => fs.unlinkSync(imagePath));
     }
 
     else {
